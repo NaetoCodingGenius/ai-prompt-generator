@@ -213,7 +213,7 @@ export default function Home() {
             {!selectedTemplate ? (
               <TemplateSelector
                 onSelectTemplate={setSelectedTemplate}
-                selectedTemplateId={selectedTemplate?.id || null}
+                selectedTemplateId={null}
               />
             ) : (
               <>
