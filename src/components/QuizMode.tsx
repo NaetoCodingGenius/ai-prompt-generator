@@ -43,7 +43,7 @@ export function QuizMode({ flashcards, onExit }: QuizModeProps) {
     setShowResult(true);
   };
 
-  // Smart answer matching function
+  // Smart answer matching function - VERY LENIENT
   const checkAnswerCorrectness = (userAnswer: string, correctAnswer: string): boolean => {
     // Normalize: remove extra spaces, punctuation, and standardize separators
     const normalize = (text: string) => {
@@ -51,7 +51,7 @@ export function QuizMode({ flashcards, onExit }: QuizModeProps) {
         .toLowerCase()
         .replace(/[.,;:!?()]/g, '') // Remove punctuation
         .replace(/\s+/g, ' ') // Normalize whitespace
-        .replace(/\b(and|or|the|a|an|is|are|of|in|on|at|to|for)\b/g, '') // Remove common words
+        .replace(/\b(and|or|the|a|an|is|are|of|in|on|at|to|for|with|that|which|who|by)\b/g, '') // Remove common filler words
         .trim();
     };
 
@@ -61,37 +61,82 @@ export function QuizMode({ flashcards, onExit }: QuizModeProps) {
     // Exact match after normalization
     if (normalizedUser === normalizedCorrect) return true;
 
-    // Extract key terms (words 3+ chars)
-    const extractKeyTerms = (text: string): Set<string> => {
-      return new Set(
-        text
-          .split(/[\s,;-]+/)
-          .filter(word => word.length >= 3)
-          .map(word => word.replace(/s$/, '')) // Remove plural 's'
-      );
+    // Extract key terms (words 3+ chars) and rank by importance
+    const extractKeyTerms = (text: string): string[] => {
+      return text
+        .split(/[\s,;-]+/)
+        .filter(word => word.length >= 3)
+        .map(word => word.replace(/s$/, '')) // Remove plural 's'
+        .filter(word => word.length >= 3); // Re-filter after removing 's'
     };
 
-    const userTerms = extractKeyTerms(normalizedUser);
+    const userTerms = new Set(extractKeyTerms(normalizedUser));
     const correctTerms = extractKeyTerms(normalizedCorrect);
 
-    // Check if user answer contains all key terms from correct answer
-    const hasAllKeyTerms = Array.from(correctTerms).every(term => {
-      // Check for exact match or partial match
-      return Array.from(userTerms).some(userTerm =>
-        userTerm.includes(term) || term.includes(userTerm) ||
-        // Check for hyphenated variations (e.g., "non-metals" vs "nonmetals")
-        userTerm.replace(/-/g, '') === term.replace(/-/g, '')
-      );
-    });
+    // Count how many key terms from correct answer appear in user answer
+    let matchedTerms = 0;
+    const totalTerms = correctTerms.length;
 
-    if (hasAllKeyTerms && correctTerms.size > 0) return true;
+    for (const correctTerm of correctTerms) {
+      const isMatched = Array.from(userTerms).some(userTerm => {
+        // Exact match
+        if (userTerm === correctTerm) return true;
+        // Partial match (one contains the other)
+        if (userTerm.includes(correctTerm) || correctTerm.includes(userTerm)) return true;
+        // Hyphenated variations (e.g., "non-metals" vs "nonmetals")
+        if (userTerm.replace(/-/g, '') === correctTerm.replace(/-/g, '')) return true;
+        // Very close match (edit distance 1-2 for typos)
+        return levenshteinDistance(userTerm, correctTerm) <= 2;
+      });
 
-    // Fallback: substring matching for short answers
-    if (correctAnswer.length < 50) {
+      if (isMatched) matchedTerms++;
+    }
+
+    // VERY LENIENT: Accept if user got 40% or more of the key terms
+    // This means students don't need perfect wording, just the main concepts
+    const matchPercentage = totalTerms > 0 ? matchedTerms / totalTerms : 0;
+    if (matchPercentage >= 0.4) return true;
+
+    // Also accept if user has at least 2 matching key terms (for any answer)
+    // This catches cases where the user got the core concepts right
+    if (matchedTerms >= 2) return true;
+
+    // Fallback: substring matching for very short answers
+    if (correctAnswer.length < 30) {
       return correctAnswer.includes(userAnswer) || userAnswer.includes(correctAnswer);
     }
 
     return false;
+  };
+
+  // Simple Levenshtein distance for typo tolerance
+  const levenshteinDistance = (str1: string, str2: string): number => {
+    const len1 = str1.length;
+    const len2 = str2.length;
+    const matrix: number[][] = [];
+
+    for (let i = 0; i <= len1; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= len2; j++) {
+      matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= len1; i++) {
+      for (let j = 1; j <= len2; j++) {
+        if (str1[i - 1] === str2[j - 1]) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1, // substitution
+            matrix[i][j - 1] + 1,     // insertion
+            matrix[i - 1][j] + 1      // deletion
+          );
+        }
+      }
+    }
+
+    return matrix[len1][len2];
   };
 
   const handleNext = () => {
