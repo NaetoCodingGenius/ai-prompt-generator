@@ -1,8 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Flashcard } from '@/types/studyset';
 
-// Use Claude Haiku for cost-effective flashcard generation (90% cheaper than Opus)
-const MODEL = 'claude-haiku-4-20250514';
+// Use Claude 3.5 Haiku for cost-effective flashcard generation (90% cheaper than Opus)
+const MODEL = 'claude-3-5-haiku-20241022';
 
 export interface GenerateFlashcardsOptions {
   content: string;
