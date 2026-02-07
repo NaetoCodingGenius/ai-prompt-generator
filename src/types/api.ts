@@ -1,14 +1,29 @@
+import { Flashcard } from './studyset';
+
+// PDF Upload endpoint
+export interface UploadResponse {
+  success: boolean;
+  text?: string;
+  pageCount?: number;
+  fileName?: string;
+  error?: string;
+}
+
+// Flashcard generation endpoint
 export interface GenerateRequest {
-  templateId: string;
-  userInput: Record<string, string>;
-  previousPrompt?: string;
-  refinementFeedback?: string;
-  userApiKey?: string;
+  text: string;
+  count?: number;
 }
 
 export interface GenerateResponse {
   success: boolean;
-  prompt: string;
+  flashcards?: Flashcard[];
+  metadata?: {
+    model: string;
+    tokensUsed: number;
+    processingTime: number;
+    remaining: number; // Remaining generations today
+  };
   error?: string;
-  tokensUsed?: number;
+  limitReached?: boolean;
 }

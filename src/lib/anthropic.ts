@@ -1,54 +1,82 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { Flashcard } from '@/types/studyset';
 
-export interface GeneratePromptOptions {
-  systemPrompt: string;
-  userPrompt: string;
-  previousPrompt?: string;
-  refinementFeedback?: string;
-  apiKey?: string;
+// Use Claude Haiku for cost-effective flashcard generation (90% cheaper than Opus)
+const MODEL = 'claude-haiku-4-20250514';
+
+export interface GenerateFlashcardsOptions {
+  content: string;
+  count?: number;
 }
 
-export async function generatePrompt(
-  options: GeneratePromptOptions
-): Promise<{ prompt: string; tokensUsed: number }> {
-  const { systemPrompt, userPrompt, previousPrompt, refinementFeedback, apiKey } = options;
+/**
+ * Generate flashcards from text content using Claude Haiku
+ */
+export async function generateFlashcards(
+  options: GenerateFlashcardsOptions
+): Promise<{ flashcards: Flashcard[]; tokensUsed: number }> {
+  const { content, count = 20 } = options;
 
-  // Use user's API key if provided, otherwise use server's key
   const client = new Anthropic({
-    apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
+    apiKey: process.env.ANTHROPIC_API_KEY,
   });
 
-  let fullUserPrompt = userPrompt;
+  const systemPrompt = `You are an expert study assistant. Create high-quality flashcards from the provided content.
 
-  if (previousPrompt && refinementFeedback) {
-    fullUserPrompt = `
-Previous prompt that was generated:
-${previousPrompt}
+Rules:
+1. Extract key concepts, definitions, and important facts
+2. Make fronts concise questions (10-15 words)
+3. Make backs clear, complete answers (20-50 words)
+4. Avoid yes/no questions
+5. Cover different topics evenly
+6. Return ONLY valid JSON, no markdown or code blocks`;
 
-User feedback for refinement:
-${refinementFeedback}
+  // Limit content to ~10k tokens to stay within budget
+  const truncatedContent = content.slice(0, 8000);
 
-Please improve and refine the prompt based on this feedback while maintaining its core purpose and structure. Make it better suited to the user's needs.
-`;
-  }
+  const userPrompt = `Create ${count} flashcards from this content:
+
+${truncatedContent}
+
+Return JSON array:
+[
+  { "front": "Question or term", "back": "Answer or definition" },
+  ...
+]`;
 
   const message = await client.messages.create({
-    model: 'claude-opus-4-20250514',
-    max_tokens: 2048,
+    model: MODEL,
+    max_tokens: 4096,
     system: systemPrompt,
     messages: [
       {
         role: 'user',
-        content: fullUserPrompt,
+        content: userPrompt,
       },
     ],
   });
 
-  const content = message.content[0];
-  const promptText = content.type === 'text' ? content.text : '';
+  const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+
+  // Parse JSON response (extract JSON array from response)
+  const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) {
+    throw new Error('Failed to parse flashcards from AI response');
+  }
+
+  const flashcardsRaw = JSON.parse(jsonMatch[0]);
+
+  // Add IDs and metadata to flashcards
+  const flashcards: Flashcard[] = flashcardsRaw.map((card: any) => ({
+    id: crypto.randomUUID(),
+    front: card.front || '',
+    back: card.back || '',
+    confidence: 0,
+    lastReviewed: null,
+  }));
 
   return {
-    prompt: promptText,
+    flashcards,
     tokensUsed: message.usage.input_tokens + message.usage.output_tokens,
   };
 }
