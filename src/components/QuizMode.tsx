@@ -26,11 +26,12 @@ export function QuizMode({ flashcards, onExit }: QuizModeProps) {
   const handleSubmitAnswer = () => {
     if (!userAnswer.trim()) return;
 
+    const question = currentCard.front.toLowerCase().trim();
     const correctAnswer = currentCard.back.toLowerCase().trim();
     const userAnswerNormalized = userAnswer.toLowerCase().trim();
 
-    // Improved fuzzy matching logic
-    const isCorrect = checkAnswerCorrectness(userAnswerNormalized, correctAnswer);
+    // Improved fuzzy matching logic - pass question to filter out question terms
+    const isCorrect = checkAnswerCorrectness(userAnswerNormalized, correctAnswer, question);
 
     const newAnswer = {
       cardId: currentCard.id,
@@ -43,8 +44,8 @@ export function QuizMode({ flashcards, onExit }: QuizModeProps) {
     setShowResult(true);
   };
 
-  // Smart answer matching function - VERY LENIENT
-  const checkAnswerCorrectness = (userAnswer: string, correctAnswer: string): boolean => {
+  // Smart answer matching function - VERY LENIENT but filters question terms
+  const checkAnswerCorrectness = (userAnswer: string, correctAnswer: string, question: string): boolean => {
     // Normalize: remove extra spaces, punctuation, and standardize separators
     const normalize = (text: string) => {
       return text
@@ -57,6 +58,7 @@ export function QuizMode({ flashcards, onExit }: QuizModeProps) {
 
     const normalizedUser = normalize(userAnswer);
     const normalizedCorrect = normalize(correctAnswer);
+    const normalizedQuestion = normalize(question);
 
     // Exact match after normalization
     if (normalizedUser === normalizedCorrect) return true;
@@ -70,8 +72,34 @@ export function QuizMode({ flashcards, onExit }: QuizModeProps) {
         .filter(word => word.length >= 3); // Re-filter after removing 's'
     };
 
-    const userTerms = new Set(extractKeyTerms(normalizedUser));
-    const correctTerms = extractKeyTerms(normalizedCorrect);
+    // Extract terms from question to filter them out
+    const questionTerms = new Set(extractKeyTerms(normalizedQuestion));
+
+    // Filter out question terms from both user and correct answers
+    const filterQuestionTerms = (terms: string[]): string[] => {
+      return terms.filter(term => {
+        // Don't filter if term doesn't appear in question
+        const isInQuestion = Array.from(questionTerms).some(qTerm => {
+          if (qTerm === term) return true;
+          if (qTerm.includes(term) || term.includes(qTerm)) return true;
+          // Check with typo tolerance
+          return levenshteinDistance(qTerm, term) <= 1;
+        });
+        return !isInQuestion; // Keep terms NOT in question
+      });
+    };
+
+    const userTermsRaw = extractKeyTerms(normalizedUser);
+    const correctTermsRaw = extractKeyTerms(normalizedCorrect);
+
+    // Filter out question terms - only match on answer-specific terms
+    const userTerms = new Set(filterQuestionTerms(userTermsRaw));
+    const correctTerms = filterQuestionTerms(correctTermsRaw);
+
+    // Minimum quality check: answer must have at least some unique terms
+    if (userTerms.size === 0) {
+      return false; // User just repeated the question with no actual answer
+    }
 
     // Count how many key terms from correct answer appear in user answer
     let matchedTerms = 0;
