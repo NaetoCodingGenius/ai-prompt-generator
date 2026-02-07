@@ -15,20 +15,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Prompt Generator - Create Professional AI Prompts with Claude",
-  description: "Free AI-powered prompt generator using Claude Opus 4. Create professional, tailored prompts for coding, writing, analysis, and more. Get better AI responses instantly.",
-  keywords: ["AI prompt generator", "Claude AI", "prompt engineering", "AI prompts", "ChatGPT prompts", "prompt creator"],
-  authors: [{ name: "AI Prompt Generator" }],
+  title: "AI Study Assistant - Upload Anything, Study in Seconds",
+  description: "Free AI-powered study assistant using Claude AI. Upload PDFs and get instant flashcards. Smart, fast, and effective studying powered by advanced AI.",
+  keywords: ["AI study assistant", "flashcard generator", "Claude AI", "study flashcards", "PDF to flashcards", "AI learning", "study helper"],
+  authors: [{ name: "AI Study Assistant" }],
   openGraph: {
-    title: "AI Prompt Generator - Create Professional AI Prompts",
-    description: "Generate professional-level prompts for any AI system. Powered by Claude Opus 4.",
+    title: "AI Study Assistant - Upload Anything, Study in Seconds",
+    description: "Transform any study material into instant flashcards. Upload PDFs, screenshots, and more. Powered by Claude AI.",
     type: "website",
     url: "https://ai-prompt-generator-beta.vercel.app",
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Prompt Generator",
-    description: "Create professional AI prompts powered by Claude",
+    title: "AI Study Assistant",
+    description: "Upload anything. Study in seconds. Powered by Claude AI.",
   },
 };
 
