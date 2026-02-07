@@ -251,8 +251,64 @@ export default function Home() {
                   </Button>
                 </div>
 
+                {/* View Mode Switcher */}
+                <div className="flex gap-2 border-b">
+                  <Button
+                    variant={viewMode === 'study' ? 'default' : 'ghost'}
+                    onClick={() => setViewMode('study')}
+                    size="sm"
+                  >
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Flashcards
+                  </Button>
+                  {generatedSummary && (
+                    <Button
+                      variant={viewMode === 'summary' ? 'default' : 'ghost'}
+                      onClick={() => setViewMode('summary')}
+                      size="sm"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Summary
+                    </Button>
+                  )}
+                  <Button
+                    variant={viewMode === 'quiz' ? 'default' : 'ghost'}
+                    onClick={() => setViewMode('quiz')}
+                    size="sm"
+                  >
+                    <GraduationCap className="h-4 w-4 mr-2" />
+                    Take Quiz
+                  </Button>
+                </div>
+
+                {/* Quiz Mode */}
+                {viewMode === 'quiz' && (
+                  <QuizMode
+                    flashcards={generatedFlashcards}
+                    onExit={() => setViewMode('study')}
+                  />
+                )}
+
+                {/* Summary View */}
+                {viewMode === 'summary' && generatedSummary && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>AI Summary</CardTitle>
+                      <CardDescription>
+                        Key points from {uploadedFileName}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="prose prose-sm max-w-none">
+                        <div className="whitespace-pre-wrap">{generatedSummary}</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Preview Flashcards */}
-                <Card>
+                {viewMode === 'study' && (
+                  <Card>
                   <CardHeader>
                     <CardTitle>Preview Flashcards</CardTitle>
                     <CardDescription>
@@ -280,6 +336,7 @@ export default function Home() {
                     ))}
                   </CardContent>
                 </Card>
+                )}
               </>
             ) : uploadedText ? (
               /* PDF Uploaded - Ready to Generate */
