@@ -1,93 +1,97 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generatePrompt } from '@/lib/anthropic';
-import { getTemplateById, interpolateTemplate } from '@/lib/templates';
+import { generateFlashcards } from '@/lib/anthropic';
 import { GenerateRequest, GenerateResponse } from '@/types/api';
 
-// Simple rate limiting
-const requestCounts = new Map<string, { count: number; resetTime: number }>();
+// Simple IP-based daily rate limiting (in-memory)
+// Maps IP address to usage count and date
+const usageTracker = new Map<string, { count: number; date: string }>();
 
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const limit = requestCounts.get(ip);
-
-  if (!limit || now > limit.resetTime) {
-    requestCounts.set(ip, { count: 1, resetTime: now + 60000 }); // 1 minute window
-    return true;
-  }
-
-  if (limit.count >= 10) {
-    // 10 requests per minute
-    return false;
-  }
-
-  limit.count++;
-  return true;
-}
+const DAILY_LIMIT = 3;
 
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting
-    const ip = request.headers.get('x-forwarded-for') || 'unknown';
-    if (!checkRateLimit(ip)) {
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // Check/update daily limit
+    const usage = usageTracker.get(ip) || { count: 0, date: today };
+
+    // Reset counter if new day
+    if (usage.date !== today) {
+      usage.count = 0;
+      usage.date = today;
+    }
+
+    // Enforce daily limit
+    if (usage.count >= DAILY_LIMIT) {
       return NextResponse.json(
-        { success: false, error: 'Rate limit exceeded. Please try again in a minute.' } as GenerateResponse,
+        {
+          success: false,
+          error: `Daily limit reached (${DAILY_LIMIT} per day). Upgrade to Premium for unlimited generations!`,
+          limitReached: true,
+        } as GenerateResponse,
         { status: 429 }
       );
     }
 
+    // Parse request body
     const body: GenerateRequest = await request.json();
-    const { templateId, userInput, previousPrompt, refinementFeedback, userApiKey } = body;
+    const { text, count = 20 } = body;
 
-    // Validate template
-    const template = getTemplateById(templateId);
-    if (!template) {
+    // Validate input
+    if (!text || text.trim().length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Template not found' } as GenerateResponse,
-        { status: 404 }
+        { success: false, error: 'No text content provided' } as GenerateResponse,
+        { status: 400 }
       );
     }
 
-    // Validate required parameters
-    for (const param of template.parameters) {
-      if (param.required && !userInput[param.id]) {
-        return NextResponse.json(
-          { success: false, error: `Missing required field: ${param.label}` } as GenerateResponse,
-          { status: 400 }
-        );
-      }
+    if (text.length < 100) {
+      return NextResponse.json(
+        { success: false, error: 'Text content too short. Please provide at least 100 characters.' } as GenerateResponse,
+        { status: 400 }
+      );
     }
 
-    // Interpolate user inputs into template
-    const userPrompt = interpolateTemplate(template.userPromptTemplate, userInput);
-
-    // Call Claude API (use user's key if provided, otherwise use server's key for free tier)
-    const { prompt, tokensUsed } = await generatePrompt({
-      systemPrompt: template.systemPrompt,
-      userPrompt,
-      previousPrompt,
-      refinementFeedback,
-      apiKey: userApiKey,
+    // Generate flashcards using Claude Haiku
+    const startTime = Date.now();
+    const { flashcards, tokensUsed } = await generateFlashcards({
+      content: text,
+      count,
     });
+    const processingTime = Date.now() - startTime;
 
+    // Update usage counter
+    usage.count++;
+    usageTracker.set(ip, usage);
+
+    // Return success response
     return NextResponse.json({
       success: true,
-      prompt,
-      tokensUsed,
+      flashcards,
+      metadata: {
+        model: 'claude-haiku-4-20250514',
+        tokensUsed,
+        processingTime,
+        remaining: DAILY_LIMIT - usage.count,
+      },
     } as GenerateResponse);
   } catch (error) {
-    console.error('Error generating prompt:', error);
+    console.error('Flashcard generation error:', error);
 
-    let errorMessage = 'Unknown error occurred';
+    let errorMessage = 'Failed to generate flashcards';
     if (error instanceof Error) {
       errorMessage = error.message;
 
       // Provide helpful messages for common errors
-      if (errorMessage.includes('not_found_error')) {
-        errorMessage = 'The AI model is not available. Please check your API key has access to Claude models.';
-      } else if (errorMessage.includes('authentication')) {
-        errorMessage = 'API key authentication failed. Please verify your API key in .env.local';
+      if (errorMessage.includes('not_found_error') || errorMessage.includes('model')) {
+        errorMessage = 'AI model not available. Please try again later.';
+      } else if (errorMessage.includes('authentication') || errorMessage.includes('api_key')) {
+        errorMessage = 'Server configuration error. Please contact support.';
       } else if (errorMessage.includes('rate_limit')) {
-        errorMessage = 'Rate limit exceeded. Please wait a moment and try again.';
+        errorMessage = 'Service temporarily busy. Please try again in a moment.';
+      } else if (errorMessage.includes('parse')) {
+        errorMessage = 'Failed to process AI response. Please try again.';
       }
     }
 
