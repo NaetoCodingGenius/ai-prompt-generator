@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateFlashcards } from '@/lib/anthropic';
+import { generateFlashcards, generateSummary } from '@/lib/anthropic';
 import { GenerateRequest, GenerateResponse } from '@/types/api';
 
 // Simple IP-based daily rate limiting (in-memory)
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: GenerateRequest = await request.json();
-    const { text, count = 20 } = body;
+    const { text, count = 20, includeSummary = true } = body;
 
     // Validate input
     if (!text || text.trim().length === 0) {
@@ -53,13 +53,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate flashcards using Claude Haiku
+    // Generate flashcards and summary in parallel
     const startTime = Date.now();
-    const { flashcards, tokensUsed } = await generateFlashcards({
-      content: text,
-      count,
-    });
+    const results = await Promise.all([
+      generateFlashcards({ content: text, count }),
+      includeSummary ? generateSummary(text) : Promise.resolve(null),
+    ]);
+
+    const flashcardsResult = results[0];
+    const summaryResult = results[1];
     const processingTime = Date.now() - startTime;
+
+    const totalTokens = flashcardsResult.tokensUsed + (summaryResult?.tokensUsed || 0);
 
     // Update usage counter
     usage.count++;
@@ -68,10 +73,11 @@ export async function POST(request: NextRequest) {
     // Return success response
     return NextResponse.json({
       success: true,
-      flashcards,
+      flashcards: flashcardsResult.flashcards,
+      summary: summaryResult?.summary,
       metadata: {
         model: 'claude-3-haiku-20240307',
-        tokensUsed,
+        tokensUsed: totalTokens,
         processingTime,
         remaining: DAILY_LIMIT - usage.count,
       },

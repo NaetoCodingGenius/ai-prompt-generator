@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { FileUploader } from '@/components/FileUploader';
 import { FlashcardViewer } from '@/components/FlashcardViewer';
+import { QuizMode } from '@/components/QuizMode';
 import { StudySetList } from '@/components/StudySetList';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdBanner } from '@/components/AdBanner';
@@ -13,14 +14,16 @@ import { useStudyStore } from '@/store/studyStore';
 import { useAppStore } from '@/store/appStore';
 import { StudySet, Flashcard } from '@/types/studyset';
 import toast from 'react-hot-toast';
-import { BookOpen, Sparkles, Upload, Brain, ArrowLeft, Loader2, Info } from 'lucide-react';
+import { BookOpen, Sparkles, Upload, Brain, ArrowLeft, Loader2, Info, FileText, GraduationCap } from 'lucide-react';
 
 export default function Home() {
   const [uploadedText, setUploadedText] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [uploadedPageCount, setUploadedPageCount] = useState<number>(0);
   const [generatedFlashcards, setGeneratedFlashcards] = useState<Flashcard[]>([]);
+  const [generatedSummary, setGeneratedSummary] = useState<string | null>(null);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'study' | 'quiz' | 'summary'>('study');
 
   const { studySets, addStudySet, usageStats, incrementUsage, canGenerateToday } =
     useStudyStore();
@@ -67,13 +70,15 @@ export default function Home() {
 
       if (data.success) {
         const flashcards = data.flashcards as Flashcard[];
+        const summary = data.summary || null;
         setGeneratedFlashcards(flashcards);
+        setGeneratedSummary(summary);
 
         // Increment usage
         incrementUsage();
 
         toast.success(
-          `Generated ${flashcards.length} flashcards! (${
+          `Generated ${flashcards.length} flashcards${summary ? ' + summary' : ''}! (${
             data.metadata.remaining
           } generation${data.metadata.remaining === 1 ? '' : 's'} remaining today)`
         );
@@ -95,13 +100,14 @@ export default function Home() {
       id: crypto.randomUUID(),
       title: uploadedFileName.replace('.pdf', ''),
       description: `${generatedFlashcards.length} flashcards from ${uploadedPageCount} pages`,
+      summary: generatedSummary || undefined,
       sourceType: 'pdf',
       sourceName: uploadedFileName,
       flashcards: generatedFlashcards,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       metadata: {
-        model: 'claude-haiku-4-20250514',
+        model: 'claude-3-haiku-20240307',
         tokensUsed: 0,
         processingTime: 0,
       },
@@ -115,6 +121,8 @@ export default function Home() {
     setUploadedFileName(null);
     setUploadedPageCount(0);
     setGeneratedFlashcards([]);
+    setGeneratedSummary(null);
+    setViewMode('study');
   };
 
   const handleSelectStudySet = (set: StudySet) => {
