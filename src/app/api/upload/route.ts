@@ -35,11 +35,14 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
 
     // Extract text from PDF
+    console.log('Attempting to extract text from PDF:', file.name, 'size:', buffer.length);
     const { text, pageCount } = await extractTextFromPDF(buffer);
+    console.log('Extraction successful, text length:', text.length, 'pages:', pageCount);
 
     // Validate extracted text
     const validation = validateExtractedText(text);
     if (!validation.valid) {
+      console.log('Text validation failed:', validation.error);
       return NextResponse.json(
         { success: false, error: validation.error } as UploadResponse,
         { status: 400 }
@@ -53,9 +56,16 @@ export async function POST(request: NextRequest) {
       fileName: file.name,
     } as UploadResponse);
   } catch (error) {
-    console.error('PDF upload error:', error);
+    console.error('PDF upload error - Full details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
 
-    const errorMessage = error instanceof Error ? error.message : 'Failed to process PDF';
+    let errorMessage = 'Failed to process PDF';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
 
     return NextResponse.json(
       { success: false, error: errorMessage } as UploadResponse,

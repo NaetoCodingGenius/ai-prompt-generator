@@ -9,9 +9,18 @@ export interface PDFExtractionResult {
  */
 export async function extractTextFromPDF(buffer: Buffer): Promise<PDFExtractionResult> {
   try {
+    console.log('Starting PDF extraction, buffer size:', buffer.length);
+
     // Use require for better CommonJS compatibility in serverless
     const pdf = require('pdf-parse');
+    console.log('pdf-parse loaded successfully');
+
     const data = await pdf(buffer);
+    console.log('PDF parsed successfully, pages:', data.numpages, 'text length:', data.text?.length);
+
+    if (!data.text) {
+      throw new Error('No text content extracted from PDF');
+    }
 
     return {
       text: data.text,
@@ -19,7 +28,15 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<PDFExtractionR
       metadata: data.info || {},
     };
   } catch (error) {
-    console.error('PDF extraction error:', error);
+    console.error('PDF extraction error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      error: error,
+    });
+
+    if (error instanceof Error) {
+      throw new Error(`Failed to extract text from PDF: ${error.message}`);
+    }
     throw new Error('Failed to extract text from PDF');
   }
 }
