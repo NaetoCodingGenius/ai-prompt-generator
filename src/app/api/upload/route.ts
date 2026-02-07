@@ -64,11 +64,5 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Configure route to handle larger file uploads
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-};
+// Note: Next.js App Router handles file uploads automatically
+// No body parser config needed - file size limits are managed by the server

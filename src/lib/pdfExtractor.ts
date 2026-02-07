@@ -1,5 +1,3 @@
-import pdf from 'pdf-parse';
-
 export interface PDFExtractionResult {
   text: string;
   pageCount: number;
@@ -11,6 +9,9 @@ export interface PDFExtractionResult {
  */
 export async function extractTextFromPDF(buffer: Buffer): Promise<PDFExtractionResult> {
   try {
+    // Dynamic import - pdf-parse is a CommonJS module
+    const pdfParse = await import('pdf-parse');
+    const pdf = (pdfParse as any).default || pdfParse;
     const data = await pdf(buffer);
 
     return {
