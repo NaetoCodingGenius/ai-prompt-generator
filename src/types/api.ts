@@ -13,11 +13,13 @@ export interface UploadResponse {
 export interface GenerateRequest {
   text: string;
   count?: number;
+  includeSummary?: boolean; // Whether to also generate a summary
 }
 
 export interface GenerateResponse {
   success: boolean;
   flashcards?: Flashcard[];
+  summary?: string; // AI-generated summary of the content
   metadata?: {
     model: string;
     tokensUsed: number;

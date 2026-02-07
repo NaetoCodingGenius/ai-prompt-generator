@@ -80,3 +80,50 @@ Return JSON array:
     tokensUsed: message.usage.input_tokens + message.usage.output_tokens,
   };
 }
+
+/**
+ * Generate a summary of the study material
+ */
+export async function generateSummary(
+  content: string
+): Promise<{ summary: string; tokensUsed: number }> {
+  const client = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+  });
+
+  const systemPrompt = `You are an expert at summarizing study material. Create a clear, concise summary that:
+1. Highlights the main topics and key concepts
+2. Organizes information logically
+3. Uses bullet points for clarity
+4. Keeps it brief but comprehensive (200-400 words)`;
+
+  const truncatedContent = content.slice(0, 8000);
+
+  const userPrompt = `Summarize this study material:
+
+${truncatedContent}
+
+Provide a well-structured summary with:
+- Main topics covered
+- Key concepts and definitions
+- Important facts to remember`;
+
+  const message = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: systemPrompt,
+    messages: [
+      {
+        role: 'user',
+        content: userPrompt,
+      },
+    ],
+  });
+
+  const summary = message.content[0].type === 'text' ? message.content[0].text : '';
+
+  return {
+    summary,
+    tokensUsed: message.usage.input_tokens + message.usage.output_tokens,
+  };
+}

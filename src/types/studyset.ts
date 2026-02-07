@@ -10,6 +10,7 @@ export interface StudySet {
   id: string;
   title: string;
   description?: string;
+  summary?: string; // AI-generated summary of the material
   sourceType: 'pdf' | 'screenshot' | 'youtube' | 'voice' | 'manual';
   sourceName: string; // Original file name or URL
   flashcards: Flashcard[];
@@ -20,6 +21,18 @@ export interface StudySet {
     tokensUsed: number;
     processingTime: number;
   };
+}
+
+export interface QuizResult {
+  correct: number;
+  total: number;
+  percentage: number;
+  answers: {
+    cardId: string;
+    userAnswer: string;
+    correctAnswer: string;
+    isCorrect: boolean;
+  }[];
 }
 
 export interface UsageStats {
