@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       success: true,
       flashcards,
       metadata: {
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-haiku-20240307',
         tokensUsed,
         processingTime,
         remaining: DAILY_LIMIT - usage.count,
