@@ -77,8 +77,28 @@ export default function Home() {
         // Increment usage
         incrementUsage();
 
+        // Auto-save study set immediately after generation
+        const newStudySet: StudySet = {
+          id: crypto.randomUUID(),
+          title: uploadedFileName?.replace('.pdf', '') || 'Untitled Study Set',
+          description: `${flashcards.length} flashcards from ${uploadedPageCount} pages`,
+          summary: summary || undefined,
+          sourceType: 'pdf',
+          sourceName: uploadedFileName || 'unknown.pdf',
+          flashcards: flashcards,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          metadata: {
+            model: 'claude-3-haiku-20240307',
+            tokensUsed: data.metadata?.tokensUsed || 0,
+            processingTime: data.metadata?.processingTime || 0,
+          },
+        };
+
+        addStudySet(newStudySet);
+
         toast.success(
-          `Generated ${flashcards.length} flashcards${summary ? ' + summary' : ''}! (${
+          `Generated ${flashcards.length} flashcards${summary ? ' + summary' : ''} and saved! (${
             data.metadata.remaining
           } generation${data.metadata.remaining === 1 ? '' : 's'} remaining today)`
         );
@@ -231,25 +251,18 @@ export default function Home() {
                 <Alert>
                   <Info className="h-4 w-4" />
                   <AlertDescription>
-                    Generated {generatedFlashcards.length} flashcards! Review them
-                    below, then save your study set.
+                    Generated {generatedFlashcards.length} flashcards and auto-saved to your study sets!
                   </AlertDescription>
                 </Alert>
 
-                <div className="flex gap-3">
-                  <Button onClick={handleSaveStudySet} className="flex-1">
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Save Study Set
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsStudying(true)}
-                    className="flex-1"
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Start Studying
-                  </Button>
-                </div>
+                <Button
+                  onClick={() => setIsStudying(true)}
+                  className="w-full"
+                  size="lg"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Start Studying Now
+                </Button>
 
                 {/* View Mode Switcher */}
                 <div className="flex gap-2 border-b">
