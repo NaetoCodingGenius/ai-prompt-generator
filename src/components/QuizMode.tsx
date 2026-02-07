@@ -29,10 +29,8 @@ export function QuizMode({ flashcards, onExit }: QuizModeProps) {
     const correctAnswer = currentCard.back.toLowerCase().trim();
     const userAnswerNormalized = userAnswer.toLowerCase().trim();
 
-    // Simple matching - could be improved with fuzzy matching
-    const isCorrect = correctAnswer.includes(userAnswerNormalized) ||
-                     userAnswerNormalized.includes(correctAnswer) ||
-                     correctAnswer === userAnswerNormalized;
+    // Improved fuzzy matching logic
+    const isCorrect = checkAnswerCorrectness(userAnswerNormalized, correctAnswer);
 
     const newAnswer = {
       cardId: currentCard.id,
@@ -43,6 +41,57 @@ export function QuizMode({ flashcards, onExit }: QuizModeProps) {
 
     setAnswers([...answers, newAnswer]);
     setShowResult(true);
+  };
+
+  // Smart answer matching function
+  const checkAnswerCorrectness = (userAnswer: string, correctAnswer: string): boolean => {
+    // Normalize: remove extra spaces, punctuation, and standardize separators
+    const normalize = (text: string) => {
+      return text
+        .toLowerCase()
+        .replace(/[.,;:!?()]/g, '') // Remove punctuation
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .replace(/\b(and|or|the|a|an|is|are|of|in|on|at|to|for)\b/g, '') // Remove common words
+        .trim();
+    };
+
+    const normalizedUser = normalize(userAnswer);
+    const normalizedCorrect = normalize(correctAnswer);
+
+    // Exact match after normalization
+    if (normalizedUser === normalizedCorrect) return true;
+
+    // Extract key terms (words 3+ chars)
+    const extractKeyTerms = (text: string): Set<string> => {
+      return new Set(
+        text
+          .split(/[\s,;-]+/)
+          .filter(word => word.length >= 3)
+          .map(word => word.replace(/s$/, '')) // Remove plural 's'
+      );
+    };
+
+    const userTerms = extractKeyTerms(normalizedUser);
+    const correctTerms = extractKeyTerms(normalizedCorrect);
+
+    // Check if user answer contains all key terms from correct answer
+    const hasAllKeyTerms = Array.from(correctTerms).every(term => {
+      // Check for exact match or partial match
+      return Array.from(userTerms).some(userTerm =>
+        userTerm.includes(term) || term.includes(userTerm) ||
+        // Check for hyphenated variations (e.g., "non-metals" vs "nonmetals")
+        userTerm.replace(/-/g, '') === term.replace(/-/g, '')
+      );
+    });
+
+    if (hasAllKeyTerms && correctTerms.size > 0) return true;
+
+    // Fallback: substring matching for short answers
+    if (correctAnswer.length < 50) {
+      return correctAnswer.includes(userAnswer) || userAnswer.includes(correctAnswer);
+    }
+
+    return false;
   };
 
   const handleNext = () => {
