@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Flashcard } from '@/types/studyset';
+import { initializeCard } from './spacedRepetition';
 
 // Use Claude 3 Haiku for cost-effective flashcard generation (90% cheaper than Opus)
 const MODEL = 'claude-3-haiku-20240307';
@@ -66,14 +67,14 @@ Return JSON array:
 
   const flashcardsRaw = JSON.parse(jsonMatch[0]);
 
-  // Add IDs and metadata to flashcards
-  const flashcards: Flashcard[] = flashcardsRaw.map((card: any) => ({
-    id: crypto.randomUUID(),
-    front: card.front || '',
-    back: card.back || '',
-    confidence: 0,
-    lastReviewed: null,
-  }));
+  // Add IDs and initialize SRS values for flashcards
+  const flashcards: Flashcard[] = flashcardsRaw.map((card: any) =>
+    initializeCard({
+      id: crypto.randomUUID(),
+      front: card.front || '',
+      back: card.back || '',
+    })
+  );
 
   return {
     flashcards,
