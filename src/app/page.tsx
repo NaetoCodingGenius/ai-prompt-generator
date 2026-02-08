@@ -7,6 +7,8 @@ import { QuizMode } from '@/components/QuizMode';
 import { StudySetList } from '@/components/StudySetList';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdBanner } from '@/components/AdBanner';
+import { ProgressDashboard } from '@/components/ProgressDashboard';
+import { AITutorChat } from '@/components/AITutorChat';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +16,7 @@ import { useStudyStore } from '@/store/studyStore';
 import { useAppStore } from '@/store/appStore';
 import { StudySet, Flashcard } from '@/types/studyset';
 import toast from 'react-hot-toast';
-import { BookOpen, Sparkles, Upload, Brain, ArrowLeft, Loader2, Info, FileText, GraduationCap } from 'lucide-react';
+import { BookOpen, Sparkles, Upload, Brain, ArrowLeft, Loader2, Info, FileText, GraduationCap, MessageCircle, TrendingUp } from 'lucide-react';
 
 export default function Home() {
   const [uploadedText, setUploadedText] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export default function Home() {
   const [generatedFlashcards, setGeneratedFlashcards] = useState<Flashcard[]>([]);
   const [generatedSummary, setGeneratedSummary] = useState<string | null>(null);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'study' | 'quiz' | 'summary'>('study');
+  const [viewMode, setViewMode] = useState<'study' | 'quiz' | 'summary' | 'tutor' | 'progress'>('study');
 
   const { studySets, addStudySet, usageStats, incrementUsage, canGenerateToday } =
     useStudyStore();
@@ -292,6 +294,22 @@ export default function Home() {
                     <GraduationCap className="h-4 w-4 mr-2" />
                     Take Quiz
                   </Button>
+                  <Button
+                    variant={viewMode === 'tutor' ? 'default' : 'ghost'}
+                    onClick={() => setViewMode('tutor')}
+                    size="sm"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    AI Tutor
+                  </Button>
+                  <Button
+                    variant={viewMode === 'progress' ? 'default' : 'ghost'}
+                    onClick={() => setViewMode('progress')}
+                    size="sm"
+                  >
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    Progress
+                  </Button>
                 </div>
 
                 {/* Quiz Mode */}
@@ -317,6 +335,19 @@ export default function Home() {
                       </div>
                     </CardContent>
                   </Card>
+                )}
+
+                {/* AI Tutor View */}
+                {viewMode === 'tutor' && (
+                  <AITutorChat
+                    context={uploadedText || generatedFlashcards.map(c => `Q: ${c.front}\nA: ${c.back}`).join('\n\n')}
+                    title={uploadedFileName || 'your flashcards'}
+                  />
+                )}
+
+                {/* Progress Dashboard View */}
+                {viewMode === 'progress' && (
+                  <ProgressDashboard />
                 )}
 
                 {/* Preview Flashcards */}
