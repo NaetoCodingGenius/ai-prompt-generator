@@ -88,24 +88,19 @@ export async function extractTranscriptFromYouTube(
     let transcriptItems;
 
     try {
-      // First try: English with US country
+      // First try: English language
       transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, {
         lang: 'en',
-        country: 'US',
       });
     } catch (firstError: any) {
-      console.log('First attempt failed, trying without country code...', firstError.message);
+      console.log('First attempt failed, trying any available language...', firstError.message);
 
       try {
-        // Second try: Just English, no country
-        transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, {
-          lang: 'en',
-        });
-      } catch (secondError: any) {
-        console.log('Second attempt failed, trying any available language...', secondError.message);
-
-        // Third try: Any available transcript
+        // Second try: Any available transcript
         transcriptItems = await YoutubeTranscript.fetchTranscript(videoId);
+      } catch (secondError: any) {
+        console.log('All transcript fetch attempts failed:', secondError.message);
+        throw secondError;
       }
     }
 
