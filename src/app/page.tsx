@@ -3,12 +3,19 @@
 import { useState } from 'react';
 import { FileUploader } from '@/components/FileUploader';
 import { FlashcardViewer } from '@/components/FlashcardViewer';
+import { FlashcardEditor } from '@/components/FlashcardEditor';
 import { QuizMode } from '@/components/QuizMode';
 import { StudySetList } from '@/components/StudySetList';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
+import { GenerationSettings } from '@/components/GenerationSettings';
 import { AdBanner } from '@/components/AdBanner';
 import { ProgressDashboard } from '@/components/ProgressDashboard';
 import { AITutorChat } from '@/components/AITutorChat';
+import { ImageOcclusionEditor } from '@/components/ImageOcclusionEditor';
+import { ClozeEditor } from '@/components/ClozeEditor';
+import { InstallPrompt } from '@/components/InstallPrompt';
+import { StudyTimer } from '@/components/StudyTimer';
+import { BulkImport } from '@/components/BulkImport';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,16 +23,26 @@ import { useStudyStore } from '@/store/studyStore';
 import { useAppStore } from '@/store/appStore';
 import { StudySet, Flashcard } from '@/types/studyset';
 import toast from 'react-hot-toast';
-import { BookOpen, Sparkles, Upload, Brain, ArrowLeft, Loader2, Info, FileText, GraduationCap, MessageCircle, TrendingUp } from 'lucide-react';
+import { BookOpen, Sparkles, Upload, Brain, ArrowLeft, Loader2, Info, FileText, GraduationCap, MessageCircle, TrendingUp, Image, Type, Download, Clock, RotateCcw, Youtube } from 'lucide-react';
+import { YouTubeInput } from '@/components/YouTubeInput';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Home() {
   const [uploadedText, setUploadedText] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [uploadedPageCount, setUploadedPageCount] = useState<number>(0);
+  const [uploadSource, setUploadSource] = useState<'pdf' | 'youtube'>('pdf');
   const [generatedFlashcards, setGeneratedFlashcards] = useState<Flashcard[]>([]);
   const [generatedSummary, setGeneratedSummary] = useState<string | null>(null);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'study' | 'quiz' | 'summary' | 'tutor' | 'progress'>('study');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isManualMode, setIsManualMode] = useState(false);
+  const [viewMode, setViewMode] = useState<'study' | 'quiz' | 'summary' | 'tutor' | 'progress' | 'timer'>('study');
+  const [currentStudySetId, setCurrentStudySetId] = useState<string | null>(null);
+  const [showImageOcclusionEditor, setShowImageOcclusionEditor] = useState(false);
+  const [showClozeEditor, setShowClozeEditor] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showStudyTimer, setShowStudyTimer] = useState(false);
 
   const { studySets, addStudySet, usageStats, incrementUsage, canGenerateToday } =
     useStudyStore();
@@ -39,15 +56,59 @@ export default function Home() {
     setUploadedText(data.text);
     setUploadedFileName(data.fileName);
     setUploadedPageCount(data.pageCount);
+    setUploadSource('pdf');
     toast.success(`Ready to generate flashcards from ${data.fileName}`);
   };
 
-  const handleGenerateFlashcards = async () => {
+  const handleYouTubeSuccess = (data: {
+    text: string;
+    title: string;
+    duration?: number;
+  }) => {
+    setUploadedText(data.text);
+    setUploadedFileName(data.title);
+    setUploadedPageCount(0); // No pages for YouTube
+    setUploadSource('youtube');
+    toast.success(`Ready to generate flashcards from ${data.title}`);
+  };
+
+  const handleGenerateFlashcards = async (settings: { count: number; mode: 'ai' | 'manual' }) => {
     if (!uploadedText) return;
 
-    // Check daily limit
+    // Close settings dialog
+    setSettingsOpen(false);
+
+    // Check daily limit for BOTH modes
     if (!canGenerateToday()) {
       setUpgradeDialogOpen(true);
+      return;
+    }
+
+    // Handle manual mode
+    if (settings.mode === 'manual') {
+      // Create empty flashcards for manual entry
+      const emptyFlashcards: Flashcard[] = Array.from({ length: settings.count }, (_, i) => ({
+        id: crypto.randomUUID(),
+        type: 'normal',
+        front: '',
+        back: '',
+        easeFactor: 2.5,
+        interval: 0,
+        repetitions: 0,
+        nextReviewDate: Date.now(),
+        lastReviewed: null,
+        totalReviews: 0,
+        correctCount: 0,
+        incorrectCount: 0,
+        consecutiveFails: 0,
+        isLeech: false,
+      }));
+
+      setGeneratedFlashcards(emptyFlashcards);
+      setIsManualMode(true);
+      // Increment usage for manual mode too
+      incrementUsage();
+      toast.success(`Created ${settings.count} blank flashcards - fill them in below! (${getRemainingGenerations()} generations remaining today)`);
       return;
     }
 
@@ -58,7 +119,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: uploadedText,
-          count: 20,
+          count: settings.count,
         }),
       });
 
@@ -80,13 +141,16 @@ export default function Home() {
         incrementUsage();
 
         // Auto-save study set immediately after generation
+        // Use uploadSource state for accurate source type
+        const sourceType = uploadSource === 'youtube' ? 'youtube' : uploadedFileName?.match(/\.(png|jpg|jpeg|webp)$/i) ? 'screenshot' : 'pdf';
+
         const newStudySet: StudySet = {
           id: crypto.randomUUID(),
-          title: uploadedFileName?.replace('.pdf', '') || 'Untitled Study Set',
-          description: `${flashcards.length} flashcards from ${uploadedPageCount} pages`,
+          title: uploadedFileName?.replace(/\.(pdf|png|jpg|jpeg|webp)$/i, '') || 'Untitled Study Set',
+          description: `${flashcards.length} flashcards from ${sourceType === 'youtube' ? 'YouTube video' : `${uploadedPageCount} ${uploadedPageCount === 1 ? 'page' : 'pages'}`}`,
           summary: summary || undefined,
-          sourceType: 'pdf',
-          sourceName: uploadedFileName || 'unknown.pdf',
+          sourceType,
+          sourceName: uploadedFileName || 'unknown',
           flashcards: flashcards,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -98,6 +162,7 @@ export default function Home() {
         };
 
         addStudySet(newStudySet);
+        setCurrentStudySetId(newStudySet.id); // Track the current study set
 
         toast.success(
           `Generated ${flashcards.length} flashcards${summary ? ' + summary' : ''} and saved! (${
@@ -149,12 +214,17 @@ export default function Home() {
 
   const handleSelectStudySet = (set: StudySet) => {
     setGeneratedFlashcards(set.flashcards);
+    setGeneratedSummary(set.summary || null);
+    setUploadedText(null); // Clear uploaded text when loading saved set
+    setUploadedFileName(set.sourceName);
+    setCurrentStudySetId(set.id); // Track which set is being studied
     setIsStudying(true);
   };
 
   const handleExitStudyMode = () => {
     setIsStudying(false);
-    setGeneratedFlashcards([]);
+    // DON'T clear flashcards - user should return to options view
+    // setCurrentStudySetId stays - we still want to track the active set
   };
 
   const handleStartNewUpload = () => {
@@ -163,6 +233,40 @@ export default function Home() {
     setUploadedPageCount(0);
     setGeneratedFlashcards([]);
     setIsStudying(false);
+    setIsManualMode(false);
+  };
+
+  const handleSaveManualCards = () => {
+    // Filter out empty cards
+    const validCards = generatedFlashcards.filter(card => card.front.trim() && card.back.trim());
+
+    if (validCards.length === 0) {
+      toast.error('Please fill in at least one flashcard');
+      return;
+    }
+
+    // Auto-save the study set
+    const newStudySet: StudySet = {
+      id: crypto.randomUUID(),
+      title: uploadedFileName?.replace(/\.(pdf|png|jpg|jpeg|webp)$/i, '') || 'Manual Study Set',
+      description: `${validCards.length} manually created flashcards`,
+      sourceType: 'manual',
+      sourceName: uploadedFileName || 'Manual Entry',
+      flashcards: validCards,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: {
+        model: 'manual',
+        tokensUsed: 0,
+        processingTime: 0,
+      },
+    };
+
+    addStudySet(newStudySet);
+    setCurrentStudySetId(newStudySet.id);
+    setGeneratedFlashcards(validCards);
+    setIsManualMode(false);
+    toast.success(`Saved ${validCards.length} flashcards!`);
   };
 
   const getRemainingGenerations = () => {
@@ -171,6 +275,78 @@ export default function Home() {
       return 3;
     }
     return Math.max(0, 3 - usageStats.generationsToday);
+  };
+
+  const handleSaveImageOcclusion = (flashcards: Flashcard[]) => {
+    // Check daily limit
+    if (!canGenerateToday()) {
+      setUpgradeDialogOpen(true);
+      return;
+    }
+
+    // Create study set
+    const newStudySet: StudySet = {
+      id: crypto.randomUUID(),
+      title: 'Image Occlusion Study Set',
+      description: `${flashcards.length} image occlusion flashcards`,
+      sourceType: 'screenshot',
+      sourceName: 'Image Occlusion',
+      flashcards,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: {
+        model: 'manual',
+        tokensUsed: 0,
+        processingTime: 0,
+      },
+    };
+
+    addStudySet(newStudySet);
+    setCurrentStudySetId(newStudySet.id);
+    setGeneratedFlashcards(flashcards);
+    setShowImageOcclusionEditor(false);
+    incrementUsage();
+    toast.success(`Created ${flashcards.length} image occlusion flashcards! (${getRemainingGenerations()} generations remaining today)`);
+  };
+
+  const handleSaveClozeCards = (flashcards: Flashcard[]) => {
+    // Check daily limit
+    if (!canGenerateToday()) {
+      setUpgradeDialogOpen(true);
+      return;
+    }
+
+    // Create study set
+    const newStudySet: StudySet = {
+      id: crypto.randomUUID(),
+      title: 'Cloze Deletion Study Set',
+      description: `${flashcards.length} cloze deletion flashcards`,
+      sourceType: 'manual',
+      sourceName: 'Cloze Deletion',
+      flashcards,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: {
+        model: 'manual',
+        tokensUsed: 0,
+        processingTime: 0,
+      },
+    };
+
+    addStudySet(newStudySet);
+    setCurrentStudySetId(newStudySet.id);
+    setGeneratedFlashcards(flashcards);
+    setShowClozeEditor(false);
+    incrementUsage();
+    toast.success(`Created ${flashcards.length} cloze deletion flashcards! (${getRemainingGenerations()} generations remaining today)`);
+  };
+
+  const handleBulkImport = (studySet: StudySet) => {
+    addStudySet(studySet);
+    setCurrentStudySetId(studySet.id);
+    setGeneratedFlashcards(studySet.flashcards);
+    setShowBulkImport(false);
+    toast.success(`Imported ${studySet.flashcards.length} flashcards!`);
   };
 
   return (
@@ -239,6 +415,7 @@ export default function Home() {
                 </Button>
                 <FlashcardViewer
                   flashcards={generatedFlashcards}
+                  studySetId={currentStudySetId || undefined}
                   onExit={handleExitStudyMode}
                 />
               </>
@@ -247,7 +424,7 @@ export default function Home() {
               <>
                 <Button variant="outline" onClick={handleStartNewUpload}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Upload Another PDF
+                  Upload New Material
                 </Button>
 
                 <Alert>
@@ -310,15 +487,25 @@ export default function Home() {
                     <TrendingUp className="h-4 w-4 mr-2" />
                     Progress
                   </Button>
+                  <Button
+                    variant={viewMode === 'timer' ? 'default' : 'ghost'}
+                    onClick={() => setViewMode('timer')}
+                    size="sm"
+                  >
+                    <Clock className="h-4 w-4 mr-2" />
+                    Timer
+                  </Button>
                 </div>
 
-                {/* Quiz Mode */}
-                {viewMode === 'quiz' && (
-                  <QuizMode
-                    flashcards={generatedFlashcards}
-                    onExit={() => setViewMode('study')}
-                  />
-                )}
+                {/* Quiz Mode - Keep mounted to preserve state */}
+                <div style={{ display: viewMode === 'quiz' ? 'block' : 'none' }}>
+                  {generatedFlashcards.length > 0 && (
+                    <QuizMode
+                      flashcards={generatedFlashcards}
+                      onExit={() => setViewMode('study')}
+                    />
+                  )}
+                </div>
 
                 {/* Summary View */}
                 {viewMode === 'summary' && generatedSummary && (
@@ -350,36 +537,49 @@ export default function Home() {
                   <ProgressDashboard />
                 )}
 
-                {/* Preview Flashcards */}
+                {/* Study Timer View */}
+                {viewMode === 'timer' && (
+                  <StudyTimer />
+                )}
+
+                {/* Preview/Edit Flashcards */}
                 {viewMode === 'study' && (
-                  <Card>
-                  <CardHeader>
-                    <CardTitle>Preview Flashcards</CardTitle>
-                    <CardDescription>
-                      {generatedFlashcards.length} flashcards from {uploadedFileName}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4 max-h-[600px] overflow-y-auto">
-                    {generatedFlashcards.map((card, index) => (
-                      <div
-                        key={card.id}
-                        className="border rounded-lg p-4 space-y-2 hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-start gap-2">
-                          <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
-                            {index + 1}
-                          </span>
-                          <div className="flex-1 space-y-2">
-                            <p className="font-medium">{card.front}</p>
-                            <p className="text-sm text-muted-foreground border-t pt-2">
-                              {card.back}
-                            </p>
+                  isManualMode ? (
+                    <FlashcardEditor
+                      flashcards={generatedFlashcards}
+                      onUpdate={setGeneratedFlashcards}
+                      onSave={handleSaveManualCards}
+                    />
+                  ) : (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Preview Flashcards</CardTitle>
+                        <CardDescription>
+                          {generatedFlashcards.length} flashcards from {uploadedFileName}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4 max-h-[600px] overflow-y-auto">
+                        {generatedFlashcards.map((card, index) => (
+                          <div
+                            key={card.id}
+                            className="border rounded-lg p-4 space-y-2 hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex items-start gap-2">
+                              <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
+                                {index + 1}
+                              </span>
+                              <div className="flex-1 space-y-2">
+                                <p className="font-medium">{card.front}</p>
+                                <p className="text-sm text-muted-foreground border-t pt-2">
+                                  {card.back}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )
                 )}
               </>
             ) : uploadedText ? (
@@ -387,14 +587,22 @@ export default function Home() {
               <>
                 <Button variant="outline" onClick={handleStartNewUpload}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Upload Different PDF
+                  Upload Different Material
                 </Button>
 
                 <Alert>
                   <Info className="h-4 w-4" />
                   <AlertDescription>
-                    PDF loaded: <strong>{uploadedFileName}</strong> ({uploadedPageCount}{' '}
-                    pages). Ready to generate flashcards!
+                    {uploadSource === 'youtube' ? (
+                      <>
+                        <Youtube className="inline h-3 w-3 mr-1" />
+                        YouTube transcript loaded: <strong>{uploadedFileName}</strong>. Ready to generate flashcards!
+                      </>
+                    ) : (
+                      <>
+                        PDF loaded: <strong>{uploadedFileName}</strong> ({uploadedPageCount} pages). Ready to generate flashcards!
+                      </>
+                    )}
                   </AlertDescription>
                 </Alert>
 
@@ -409,17 +617,18 @@ export default function Home() {
                     <div className="bg-muted rounded-lg p-4 space-y-2">
                       <p className="text-sm font-medium">What happens next:</p>
                       <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                        <li>Choose between AI-generated or manual creation</li>
+                        <li>Customize the number of flashcards (5-50)</li>
                         <li>AI extracts key concepts and definitions</li>
-                        <li>Creates 20 high-quality flashcards</li>
                         <li>Ready to study in seconds</li>
                         <li>
-                          Uses 1 of your {getRemainingGenerations()} daily generations
+                          AI mode uses 1 of your {getRemainingGenerations()} daily generations
                         </li>
                       </ul>
                     </div>
 
                     <Button
-                      onClick={handleGenerateFlashcards}
+                      onClick={() => setSettingsOpen(true)}
                       disabled={isGenerating}
                       className="w-full"
                       size="lg"
@@ -440,25 +649,135 @@ export default function Home() {
                 </Card>
               </>
             ) : (
-              /* Initial State - Upload PDF */
+              /* Initial State - Upload Material */
               <>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Upload className="h-5 w-5" />
-                      Upload Study Material
-                    </CardTitle>
-                    <CardDescription>
-                      Upload a PDF and we&apos;ll create flashcards automatically using AI
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <FileUploader
-                      onUploadSuccess={handleUploadSuccess}
-                      isGenerating={isGenerating}
-                    />
-                  </CardContent>
-                </Card>
+                {showImageOcclusionEditor ? (
+                  <ImageOcclusionEditor
+                    onSave={handleSaveImageOcclusion}
+                    onCancel={() => setShowImageOcclusionEditor(false)}
+                  />
+                ) : showClozeEditor ? (
+                  <ClozeEditor
+                    onSave={handleSaveClozeCards}
+                    onCancel={() => setShowClozeEditor(false)}
+                  />
+                ) : showBulkImport ? (
+                  <BulkImport
+                    onImport={handleBulkImport}
+                    onCancel={() => setShowBulkImport(false)}
+                  />
+                ) : (
+                  <>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Upload className="h-5 w-5" />
+                          Upload Study Material
+                        </CardTitle>
+                        <CardDescription>
+                          Upload PDFs or paste YouTube links to create flashcards with AI
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {/* File Upload & YouTube Tabs */}
+                        <Tabs defaultValue="pdf" className="w-full">
+                          <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="pdf" className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              PDF Upload
+                            </TabsTrigger>
+                            <TabsTrigger value="youtube" className="flex items-center gap-2">
+                              <Youtube className="h-4 w-4" />
+                              YouTube URL
+                            </TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="pdf" className="space-y-4">
+                            <FileUploader
+                              onUploadSuccess={handleUploadSuccess}
+                              isGenerating={isGenerating}
+                            />
+                          </TabsContent>
+                          <TabsContent value="youtube" className="space-y-4">
+                            <YouTubeInput
+                              onSuccess={handleYouTubeSuccess}
+                              isProcessing={isGenerating}
+                            />
+                          </TabsContent>
+                        </Tabs>
+
+                        {/* Feature Selection Guide */}
+                        <Alert className="bg-blue-50 border-blue-200">
+                          <Info className="h-4 w-4 text-blue-600" />
+                          <AlertDescription className="text-sm">
+                            <strong className="text-blue-900">Which feature should I use?</strong>
+                            <ul className="mt-2 space-y-1.5 text-blue-800">
+                              <li>
+                                <strong>📄 Upload PDF (above)</strong> → For tests, quizzes, worksheets with answer keys
+                                <br />
+                                <span className="text-xs">AI matches each question to its answer automatically</span>
+                              </li>
+                              <li>
+                                <strong>📝 Cloze Deletion (below)</strong> → For study notes, textbook content
+                                <br />
+                                <span className="text-xs">Fill-in-the-blank style cards for memorizing terms</span>
+                              </li>
+                            </ul>
+                          </AlertDescription>
+                        </Alert>
+
+                        {/* Alternative Creation Methods */}
+                        <div className="relative">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t" />
+                          </div>
+                          <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-background px-2 text-muted-foreground">
+                              Or create manually
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3">
+                          <Button
+                            variant="outline"
+                            className="h-auto py-6 flex-col"
+                            onClick={() => setShowImageOcclusionEditor(true)}
+                          >
+                            <Image className="h-8 w-8 mb-2 text-primary" />
+                            <span className="font-medium">Image Occlusion</span>
+                            <span className="text-xs text-muted-foreground mt-1">
+                              Cover parts of images
+                            </span>
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            className="h-auto py-6 flex-col"
+                            onClick={() => setShowClozeEditor(true)}
+                          >
+                            <Type className="h-8 w-8 mb-2 text-primary" />
+                            <span className="font-medium">Cloze Deletion</span>
+                            <span className="text-xs text-muted-foreground mt-1">
+                              Fill-in-the-blank cards
+                            </span>
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            className="h-auto py-6 flex-col"
+                            onClick={() => setShowBulkImport(true)}
+                          >
+                            <Download className="h-8 w-8 mb-2 text-primary" />
+                            <span className="font-medium">Bulk Import</span>
+                            <span className="text-xs text-muted-foreground mt-1">
+                              From Quizlet/Anki
+                            </span>
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
 
                 {/* How It Works */}
                 <Card>
@@ -473,7 +792,7 @@ export default function Home() {
                         </div>
                         <h3 className="font-medium">1. Upload</h3>
                         <p className="text-sm text-muted-foreground">
-                          Upload your study material (PDF, images, videos coming soon)
+                          Upload PDFs or paste YouTube links to your study material
                         </p>
                       </div>
                       <div className="space-y-2">
@@ -503,12 +822,23 @@ export default function Home() {
         </div>
       </main>
 
+      {/* Generation Settings Dialog */}
+      <GenerationSettings
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onGenerate={handleGenerateFlashcards}
+        isGenerating={isGenerating}
+      />
+
       {/* Upgrade Dialog */}
       <UpgradeDialog
         isOpen={upgradeDialogOpen}
         onClose={() => setUpgradeDialogOpen(false)}
         remainingGenerations={getRemainingGenerations()}
       />
+
+      {/* PWA Install Prompt */}
+      <InstallPrompt />
     </div>
   );
 }

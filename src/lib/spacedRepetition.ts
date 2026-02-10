@@ -58,6 +58,10 @@ export function calculateNextReview(card: Flashcard, quality: ReviewResult['qual
   const correctCount = quality >= 3 ? card.correctCount + 1 : card.correctCount;
   const incorrectCount = quality < 3 ? card.incorrectCount + 1 : card.incorrectCount;
 
+  // Leech detection - track consecutive failures
+  const consecutiveFails = quality < 3 ? (card.consecutiveFails || 0) + 1 : 0;
+  const isLeech = consecutiveFails >= 4; // Mark as leech after 4 consecutive failures
+
   return {
     ...card,
     easeFactor,
@@ -68,6 +72,8 @@ export function calculateNextReview(card: Flashcard, quality: ReviewResult['qual
     totalReviews,
     correctCount,
     incorrectCount,
+    consecutiveFails,
+    isLeech,
   };
 }
 
@@ -103,9 +109,9 @@ export function categorizeCards(cards: Flashcard[]): {
 /**
  * Initialize a new flashcard with default SRS values
  */
-export function initializeCard(card: Omit<Flashcard, 'easeFactor' | 'interval' | 'repetitions' | 'nextReviewDate' | 'lastReviewed' | 'totalReviews' | 'correctCount' | 'incorrectCount'>): Flashcard {
+export function initializeCard(card: Partial<Flashcard> & { id: string; front: string; back: string }): Flashcard {
   return {
-    ...card,
+    type: 'normal',
     easeFactor: 2.5, // Default difficulty
     interval: 0, // New card
     repetitions: 0,
@@ -114,6 +120,9 @@ export function initializeCard(card: Omit<Flashcard, 'easeFactor' | 'interval' |
     totalReviews: 0,
     correctCount: 0,
     incorrectCount: 0,
+    consecutiveFails: 0,
+    isLeech: false,
+    ...card,
   };
 }
 

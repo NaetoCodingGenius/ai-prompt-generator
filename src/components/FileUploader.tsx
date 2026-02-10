@@ -3,8 +3,9 @@
 import { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Upload, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Loader2, AlertCircle, Image } from 'lucide-react';
 import { validatePDF } from '@/lib/pdfExtractor';
+import { validateImage, extractTextFromImage } from '@/lib/imageOCR';
 import toast from 'react-hot-toast';
 
 interface FileUploaderProps {
@@ -61,15 +62,38 @@ export function FileUploader({ onUploadSuccess, isGenerating }: FileUploaderProp
   }, []);
 
   const handleFileSelect = async (file: File) => {
-    // Validate file
-    const validation = validatePDF(file);
-    if (!validation.valid) {
-      toast.error(validation.error || 'Invalid file');
+    // Check if it's an image or PDF
+    const isImage = file.type.startsWith('image/');
+    const isPDF = file.type === 'application/pdf';
+
+    if (!isImage && !isPDF) {
+      toast.error('Please upload a PDF or image file (PNG, JPG, WebP)');
       return;
     }
 
+    // Validate based on file type
+    if (isPDF) {
+      const validation = validatePDF(file);
+      if (!validation.valid) {
+        toast.error(validation.error || 'Invalid PDF file');
+        return;
+      }
+    } else if (isImage) {
+      const validation = validateImage(file);
+      if (!validation.valid) {
+        toast.error(validation.error || 'Invalid image file');
+        return;
+      }
+    }
+
     setSelectedFile(file);
-    await uploadFile(file);
+
+    // Process file based on type
+    if (isPDF) {
+      await uploadFile(file);
+    } else if (isImage) {
+      await processImage(file);
+    }
   };
 
   const uploadFile = async (file: File) => {
@@ -106,6 +130,39 @@ export function FileUploader({ onUploadSuccess, isGenerating }: FileUploaderProp
     }
   };
 
+  const processImage = async (file: File) => {
+    setIsUploading(true);
+
+    try {
+      toast.loading('Extracting text from image...', { id: 'ocr-progress' });
+
+      // Extract text using Tesseract OCR
+      const { text, confidence } = await extractTextFromImage(file);
+
+      toast.dismiss('ocr-progress');
+
+      if (!text || text.trim().length < 50) {
+        toast.error('Could not extract enough text from image. Try a clearer image.');
+        setSelectedFile(null);
+        return;
+      }
+
+      toast.success(`Text extracted from ${file.name} (${Math.round(confidence)}% confidence)`);
+
+      onUploadSuccess({
+        text: text,
+        fileName: file.name,
+        pageCount: 1, // Images are treated as 1 page
+      });
+    } catch (error) {
+      console.error('OCR error:', error);
+      toast.error('Failed to extract text from image. Please try again.');
+      setSelectedFile(null);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleClick = () => {
     fileInputRef.current?.click();
   };
@@ -126,7 +183,7 @@ export function FileUploader({ onUploadSuccess, isGenerating }: FileUploaderProp
         <input
           ref={fileInputRef}
           type="file"
-          accept="application/pdf"
+          accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp"
           onChange={handleFileInputChange}
           className="hidden"
           disabled={isUploading || isGenerating}
@@ -135,15 +192,21 @@ export function FileUploader({ onUploadSuccess, isGenerating }: FileUploaderProp
         {isUploading ? (
           <>
             <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
-            <p className="text-lg font-medium">Processing PDF...</p>
+            <p className="text-lg font-medium">
+              {selectedFile?.type.startsWith('image/') ? 'Extracting text from image...' : 'Processing PDF...'}
+            </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Extracting text from {selectedFile?.name}
+              {selectedFile?.name}
             </p>
           </>
         ) : selectedFile && !isUploading ? (
           <>
-            <FileText className="h-12 w-12 text-green-600 mb-4" />
-            <p className="text-lg font-medium text-green-600">PDF Loaded!</p>
+            {selectedFile.type.startsWith('image/') ? (
+              <Image className="h-12 w-12 text-green-600 mb-4" />
+            ) : (
+              <FileText className="h-12 w-12 text-green-600 mb-4" />
+            )}
+            <p className="text-lg font-medium text-green-600">File Loaded!</p>
             <p className="text-sm text-muted-foreground mt-1">{selectedFile.name}</p>
             <Button onClick={handleClick} variant="outline" className="mt-4">
               Choose Different File
@@ -154,14 +217,14 @@ export function FileUploader({ onUploadSuccess, isGenerating }: FileUploaderProp
             <Upload className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-lg font-medium mb-2">Upload your study material</p>
             <p className="text-sm text-muted-foreground text-center mb-4">
-              Drag and drop a PDF file here, or click to browse
+              Drag and drop a PDF or image file here, or click to browse
             </p>
             <Button onClick={handleClick} disabled={isGenerating}>
-              Choose PDF File
+              Choose File
             </Button>
             <p className="text-xs text-muted-foreground mt-4 flex items-center gap-1">
               <AlertCircle className="h-3 w-3" />
-              Maximum file size: 10MB
+              Supports: PDF, PNG, JPG, WebP • Max 10MB
             </p>
           </>
         )}

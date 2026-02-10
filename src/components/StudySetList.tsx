@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { ExportDialog } from '@/components/ExportDialog';
 import {
   BookOpen,
   Trash2,
@@ -13,6 +14,10 @@ import {
   FileText,
   Clock,
   AlertCircle,
+  Download,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react';
 import { useStudyStore } from '@/store/studyStore';
 import { StudySet } from '@/types/studyset';
@@ -24,9 +29,13 @@ interface StudySetListProps {
 }
 
 export function StudySetList({ onSelectSet, selectedSetId }: StudySetListProps) {
-  const { studySets, deleteStudySet } = useStudyStore();
+  const { studySets, deleteStudySet, updateStudySet } = useStudyStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportingSet, setExportingSet] = useState<StudySet | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
 
   // Filter study sets based on search query
   const filteredSets = studySets.filter((set) => {
@@ -72,6 +81,53 @@ export function StudySetList({ onSelectSet, selectedSetId }: StudySetListProps) 
       setTimeout(() => {
         setDeletingId(null);
       }, 3000);
+    }
+  };
+
+  // Handle export
+  const handleExport = (set: StudySet, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExportingSet(set);
+    setExportDialogOpen(true);
+  };
+
+  // Handle edit start
+  const handleEditStart = (set: StudySet, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(set.id);
+    setEditingTitle(set.title);
+  };
+
+  // Handle edit save
+  const handleEditSave = (setId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (editingTitle.trim()) {
+      updateStudySet(setId, { title: editingTitle.trim() });
+      toast.success('Study set renamed!');
+    }
+    setEditingId(null);
+    setEditingTitle('');
+  };
+
+  // Handle edit cancel
+  const handleEditCancel = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(null);
+    setEditingTitle('');
+  };
+
+  // Handle edit key press
+  const handleEditKeyPress = (e: React.KeyboardEvent, setId: string) => {
+    if (e.key === 'Enter') {
+      if (editingTitle.trim()) {
+        updateStudySet(setId, { title: editingTitle.trim() });
+        toast.success('Study set renamed!');
+      }
+      setEditingId(null);
+      setEditingTitle('');
+    } else if (e.key === 'Escape') {
+      setEditingId(null);
+      setEditingTitle('');
     }
   };
 
@@ -143,7 +199,7 @@ export function StudySetList({ onSelectSet, selectedSetId }: StudySetListProps) 
             filteredSets.map((set) => (
               <Card
                 key={set.id}
-                className={`cursor-pointer transition-all hover:shadow-md ${
+                className={`group cursor-pointer transition-all hover:shadow-md ${
                   selectedSetId === set.id
                     ? 'border-primary bg-primary/5'
                     : 'border-muted'
@@ -153,34 +209,88 @@ export function StudySetList({ onSelectSet, selectedSetId }: StudySetListProps) 
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base line-clamp-1">
-                        {set.title}
-                      </CardTitle>
-                      {set.description && (
-                        <CardDescription className="text-xs line-clamp-1 mt-1">
-                          {set.description}
-                        </CardDescription>
+                      {editingId === set.id ? (
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <Input
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onKeyDown={(e) => handleEditKeyPress(e, set.id)}
+                            className="h-8 text-base"
+                            autoFocus
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 flex-shrink-0 text-green-600 hover:text-green-700"
+                            onClick={(e) => handleEditSave(set.id, e)}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 flex-shrink-0 text-muted-foreground"
+                            onClick={handleEditCancel}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-base line-clamp-1">
+                              {set.title}
+                            </CardTitle>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => handleEditStart(set, e)}
+                              title="Rename study set"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          {set.description && (
+                            <CardDescription className="text-xs line-clamp-1 mt-1">
+                              {set.description}
+                            </CardDescription>
+                          )}
+                        </>
                       )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`h-8 w-8 flex-shrink-0 ${
-                        deletingId === set.id
-                          ? 'text-destructive hover:text-destructive'
-                          : 'text-muted-foreground'
-                      }`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(set.id, set.title);
-                      }}
-                    >
-                      {deletingId === set.id ? (
-                        <AlertCircle className="h-4 w-4" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
+                    {editingId !== set.id && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 flex-shrink-0 text-muted-foreground"
+                          onClick={(e) => handleExport(set, e)}
+                          title="Export to Anki/CSV"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`h-8 w-8 flex-shrink-0 ${
+                            deletingId === set.id
+                              ? 'text-destructive hover:text-destructive'
+                              : 'text-muted-foreground'
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(set.id, set.title);
+                          }}
+                        >
+                          {deletingId === set.id ? (
+                            <AlertCircle className="h-4 w-4" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
@@ -218,6 +328,16 @@ export function StudySetList({ onSelectSet, selectedSetId }: StudySetListProps) 
           )}
         </div>
       </ScrollArea>
+
+      {/* Export Dialog */}
+      <ExportDialog
+        isOpen={exportDialogOpen}
+        onClose={() => {
+          setExportDialogOpen(false);
+          setExportingSet(null);
+        }}
+        studySet={exportingSet}
+      />
     </div>
   );
 }

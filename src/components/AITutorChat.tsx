@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MessageCircle, Send, Loader2, Sparkles } from 'lucide-react';
+import { MessageCircle, Send, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Message {
@@ -17,11 +17,59 @@ interface AITutorChatProps {
   title?: string;
 }
 
+const DAILY_MESSAGE_LIMIT = 15;
+
+interface TutorUsage {
+  count: number;
+  date: string; // YYYY-MM-DD
+}
+
+function getTodayString() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function getTutorUsage(): TutorUsage {
+  if (typeof window === 'undefined') return { count: 0, date: getTodayString() };
+
+  const stored = localStorage.getItem('ai-tutor-usage');
+  if (!stored) {
+    return { count: 0, date: getTodayString() };
+  }
+
+  try {
+    const usage = JSON.parse(stored) as TutorUsage;
+    // Reset if new day
+    if (usage.date !== getTodayString()) {
+      return { count: 0, date: getTodayString() };
+    }
+    return usage;
+  } catch {
+    return { count: 0, date: getTodayString() };
+  }
+}
+
+function updateTutorUsage(count: number) {
+  if (typeof window === 'undefined') return;
+
+  const usage: TutorUsage = {
+    count,
+    date: getTodayString()
+  };
+  localStorage.setItem('ai-tutor-usage', JSON.stringify(usage));
+}
+
 export function AITutorChat({ context, title }: AITutorChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [messageCount, setMessageCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Load usage on mount
+  useEffect(() => {
+    const usage = getTutorUsage();
+    setMessageCount(usage.count);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -33,6 +81,13 @@ export function AITutorChat({ context, title }: AITutorChatProps) {
 
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return;
+
+    // Check daily limit
+    const usage = getTutorUsage();
+    if (usage.count >= DAILY_MESSAGE_LIMIT) {
+      toast.error(`Daily message limit reached (${DAILY_MESSAGE_LIMIT} messages). Resets tomorrow!`);
+      return;
+    }
 
     const userMessage = input.trim();
     setInput('');
@@ -57,6 +112,19 @@ export function AITutorChat({ context, title }: AITutorChatProps) {
           ...prev,
           { role: 'assistant', content: data.answer },
         ]);
+
+        // Increment usage count
+        const newCount = usage.count + 1;
+        updateTutorUsage(newCount);
+        setMessageCount(newCount);
+
+        // Warn when approaching limit
+        const remaining = DAILY_MESSAGE_LIMIT - newCount;
+        if (remaining === 3) {
+          toast('Only 3 messages left today', { icon: '⚠️' });
+        } else if (remaining === 0) {
+          toast.error('Daily limit reached! Resets tomorrow at midnight.');
+        }
       } else {
         toast.error(data.error || 'Failed to get response');
       }
@@ -75,15 +143,36 @@ export function AITutorChat({ context, title }: AITutorChatProps) {
     'How does this relate to other concepts?',
   ];
 
+  const remainingMessages = DAILY_MESSAGE_LIMIT - messageCount;
+  const isLimitReached = remainingMessages <= 0;
+
   return (
     <Card className="flex flex-col h-[600px]">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MessageCircle className="h-5 w-5" />
-          AI Tutor Chat
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5" />
+            AI Tutor Chat
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+              remainingMessages <= 3
+                ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+            }`}>
+              {remainingMessages} message{remainingMessages === 1 ? '' : 's'} left today
+            </span>
+          </div>
+        </div>
         <CardDescription>
-          Ask questions about {title || 'your study material'}
+          {isLimitReached ? (
+            <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+              <AlertCircle className="h-3 w-3" />
+              Daily limit reached. Resets tomorrow at midnight.
+            </span>
+          ) : (
+            <>Ask questions about {title || 'your study material'}</>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col gap-4 overflow-hidden">
@@ -143,7 +232,11 @@ export function AITutorChat({ context, title }: AITutorChatProps) {
         {/* Input Area */}
         <div className="flex gap-2">
           <Input
-            placeholder="Ask a question about your study material..."
+            placeholder={
+              isLimitReached
+                ? 'Daily message limit reached. Come back tomorrow!'
+                : 'Ask a question about your study material...'
+            }
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -152,12 +245,12 @@ export function AITutorChat({ context, title }: AITutorChatProps) {
                 handleSendMessage();
               }
             }}
-            disabled={isLoading}
+            disabled={isLoading || isLimitReached}
             className="flex-1"
           />
           <Button
             onClick={handleSendMessage}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || isLimitReached}
             size="icon"
           >
             {isLoading ? (

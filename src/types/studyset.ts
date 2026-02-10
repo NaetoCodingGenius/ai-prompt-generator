@@ -1,7 +1,25 @@
+export interface Occlusion {
+  id: string;
+  x: number; // X position as percentage of image width
+  y: number; // Y position as percentage of image height
+  width: number; // Width as percentage of image width
+  height: number; // Height as percentage of image height
+  label: string; // What this occluded area represents
+}
+
 export interface Flashcard {
   id: string;
+  type: 'normal' | 'image-occlusion' | 'cloze'; // Card type
   front: string; // Question/term
   back: string; // Answer/definition
+
+  // Image Occlusion fields (only for type='image-occlusion')
+  imageUrl?: string; // Base64 or URL of the image
+  occlusions?: Occlusion[]; // Areas to hide on the image
+
+  // Cloze Deletion fields (only for type='cloze')
+  clozeText?: string; // Text with {{cloze}} markers, e.g. "The {{mitochondria}} is the powerhouse"
+  clozeIndex?: number; // Which cloze to test (for multiple clozes in one card)
 
   // Spaced Repetition System (SM-2 Algorithm)
   easeFactor: number; // 1.3-2.5, default 2.5 (difficulty multiplier)
@@ -14,6 +32,10 @@ export interface Flashcard {
   totalReviews: number; // Total times reviewed
   correctCount: number; // Times answered correctly
   incorrectCount: number; // Times answered incorrectly
+
+  // Leech detection
+  isLeech?: boolean; // Marked as a problem card
+  consecutiveFails?: number; // Failed attempts in a row
 }
 
 export interface StudySet {

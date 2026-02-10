@@ -24,13 +24,26 @@ export async function generateFlashcards(
 
   const systemPrompt = `You are an expert study assistant. Create high-quality flashcards from the provided content.
 
-Rules:
+DETECT THE FORMAT:
+- If this is a TEST/QUIZ/WORKSHEET with questions and an answer key, create one flashcard per question-answer pair
+- If this is STUDY NOTES/TEXTBOOK, extract key concepts and create Q&A flashcards
+
+For TEST/QUIZ format:
+1. Identify each question (numbered 1, 2, 3... with sub-questions a, b, c...)
+2. Find the corresponding answers (usually at the bottom or in an "Answers" section)
+3. Create ONE flashcard per question with: front = full question text, back = the answer
+4. Example: Question "1a) Is y=x² linear or nonlinear?" → Answer "nonlinear" = One flashcard
+
+For STUDY NOTES format:
 1. Extract key concepts, definitions, and important facts
-2. Make fronts concise questions (10-15 words)
-3. Make backs clear, complete answers (20-50 words)
-4. Avoid yes/no questions
-5. Cover different topics evenly
-6. Return ONLY valid JSON, no markdown or code blocks`;
+2. Create questions that test understanding
+3. Make fronts concise questions (10-15 words)
+4. Make backs clear, complete answers (20-50 words)
+
+General Rules:
+- Avoid yes/no questions
+- Each flashcard should test ONE concept
+- Return ONLY valid JSON, no markdown or code blocks`;
 
   // Limit content to ~10k tokens to stay within budget
   const truncatedContent = content.slice(0, 8000);
@@ -39,9 +52,14 @@ Rules:
 
 ${truncatedContent}
 
+IMPORTANT:
+- If this is a test/quiz with an answer key, create flashcards matching each question to its answer
+- Each question (1a, 1b, 2a, etc.) should become ONE flashcard
+- Use the full question text as the front, and the specific answer as the back
+
 Return JSON array:
 [
-  { "front": "Question or term", "back": "Answer or definition" },
+  { "front": "Full question text", "back": "Answer" },
   ...
 ]`;
 

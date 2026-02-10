@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Study Assistant</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 350px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f8f9fa;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    .content {
+      padding: 16px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid #e5e7eb;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #1f2937;
+    }
+
+    .flashcard-item {
+      background: #f3f4f6;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .flashcard-text {
+      color: #374151;
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+
+    .flashcard-source {
+      font-size: 11px;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .button {
+      width: 100%;
+      padding: 10px;
+      background: #6366f1;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .button:hover {
+      background: #5558e3;
+    }
+
+    .button-outline {
+      background: white;
+      color: #6366f1;
+      border: 1px solid #6366f1;
+    }
+
+    .button-outline:hover {
+      background: #f0f1ff;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 24px;
+      color: #6b7280;
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.5;
+      padding: 12px;
+      background: #f3f4f6;
+      border-radius: 6px;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .count-badge {
+      background: #6366f1;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📚 AI Study Assistant</h1>
+    <p>Highlight text to create flashcards</p>
+  </div>
+
+  <div class="content">
+    <div id="pending-section" style="display: none;">
+      <div class="card">
+        <div class="card-title">
+          Pending Flashcards <span id="count-badge" class="count-badge">0</span>
+        </div>
+        <div id="flashcard-list"></div>
+        <div class="button-group">
+          <button class="button" id="sync-btn">Sync to App</button>
+          <button class="button button-outline" id="clear-btn">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="empty-state">
+      <div class="empty-state">
+        <div class="empty-state-icon">✨</div>
+        <p>No flashcards yet!</p>
+      </div>
+
+      <div class="help-text">
+        <strong>How to use:</strong><br>
+        1. Highlight any text on a webpage<br>
+        2. Click the "Create Flashcard" button<br>
+        3. Flashcards will appear here<br>
+        4. Click "Sync to App" to save them<br><br>
+        <strong>Keyboard shortcut:</strong> Ctrl+Shift+F (Cmd+Shift+F on Mac)
+      </div>
+
+      <button class="button" id="open-app-btn" style="margin-top: 12px;">
+        Open AI Study Assistant
+      </button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

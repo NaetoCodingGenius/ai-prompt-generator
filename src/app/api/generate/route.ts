@@ -34,8 +34,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse request body
-    const body: GenerateRequest = await request.json();
+    // Parse request body with better error handling
+    let body: GenerateRequest;
+    try {
+      body = await request.json();
+    } catch (parseError: any) {
+      console.error('JSON parse error:', parseError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid request format. The text may contain special characters that caused a parsing error. Try cleaning the text and submitting again.'
+        } as GenerateResponse,
+        { status: 400 }
+      );
+    }
     const { text, count = 20, includeSummary = true } = body;
 
     // Validate input
