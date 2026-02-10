@@ -23,15 +23,12 @@ import { useStudyStore } from '@/store/studyStore';
 import { useAppStore } from '@/store/appStore';
 import { StudySet, Flashcard } from '@/types/studyset';
 import toast from 'react-hot-toast';
-import { BookOpen, Sparkles, Upload, Brain, ArrowLeft, Loader2, Info, FileText, GraduationCap, MessageCircle, TrendingUp, Image, Type, Download, Clock, RotateCcw, Youtube } from 'lucide-react';
-import { YouTubeInput } from '@/components/YouTubeInput';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BookOpen, Sparkles, Upload, Brain, ArrowLeft, Loader2, Info, FileText, GraduationCap, MessageCircle, TrendingUp, Image, Type, Download, Clock, RotateCcw } from 'lucide-react';
 
 export default function Home() {
   const [uploadedText, setUploadedText] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [uploadedPageCount, setUploadedPageCount] = useState<number>(0);
-  const [uploadSource, setUploadSource] = useState<'pdf' | 'youtube'>('pdf');
   const [generatedFlashcards, setGeneratedFlashcards] = useState<Flashcard[]>([]);
   const [generatedSummary, setGeneratedSummary] = useState<string | null>(null);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
@@ -56,20 +53,7 @@ export default function Home() {
     setUploadedText(data.text);
     setUploadedFileName(data.fileName);
     setUploadedPageCount(data.pageCount);
-    setUploadSource('pdf');
     toast.success(`Ready to generate flashcards from ${data.fileName}`);
-  };
-
-  const handleYouTubeSuccess = (data: {
-    text: string;
-    title: string;
-    duration?: number;
-  }) => {
-    setUploadedText(data.text);
-    setUploadedFileName(data.title);
-    setUploadedPageCount(0); // No pages for YouTube
-    setUploadSource('youtube');
-    toast.success(`Ready to generate flashcards from ${data.title}`);
   };
 
   const handleGenerateFlashcards = async (settings: { count: number; mode: 'ai' | 'manual' }) => {
@@ -141,13 +125,12 @@ export default function Home() {
         incrementUsage();
 
         // Auto-save study set immediately after generation
-        // Use uploadSource state for accurate source type
-        const sourceType = uploadSource === 'youtube' ? 'youtube' : uploadedFileName?.match(/\.(png|jpg|jpeg|webp)$/i) ? 'screenshot' : 'pdf';
+        const sourceType = uploadedFileName?.match(/\.(png|jpg|jpeg|webp)$/i) ? 'screenshot' : 'pdf';
 
         const newStudySet: StudySet = {
           id: crypto.randomUUID(),
           title: uploadedFileName?.replace(/\.(pdf|png|jpg|jpeg|webp)$/i, '') || 'Untitled Study Set',
-          description: `${flashcards.length} flashcards from ${sourceType === 'youtube' ? 'YouTube video' : `${uploadedPageCount} ${uploadedPageCount === 1 ? 'page' : 'pages'}`}`,
+          description: `${flashcards.length} flashcards from ${uploadedPageCount} ${uploadedPageCount === 1 ? 'page' : 'pages'}`,
           summary: summary || undefined,
           sourceType,
           sourceName: uploadedFileName || 'unknown',
@@ -593,16 +576,7 @@ export default function Home() {
                 <Alert>
                   <Info className="h-4 w-4" />
                   <AlertDescription>
-                    {uploadSource === 'youtube' ? (
-                      <>
-                        <Youtube className="inline h-3 w-3 mr-1" />
-                        YouTube transcript loaded: <strong>{uploadedFileName}</strong>. Ready to generate flashcards!
-                      </>
-                    ) : (
-                      <>
-                        PDF loaded: <strong>{uploadedFileName}</strong> ({uploadedPageCount} pages). Ready to generate flashcards!
-                      </>
-                    )}
+                    PDF loaded: <strong>{uploadedFileName}</strong> ({uploadedPageCount} pages). Ready to generate flashcards!
                   </AlertDescription>
                 </Alert>
 
@@ -675,35 +649,14 @@ export default function Home() {
                           Upload Study Material
                         </CardTitle>
                         <CardDescription>
-                          Upload PDFs or paste YouTube links to create flashcards with AI
+                          Upload PDFs to create flashcards with AI
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        {/* File Upload & YouTube Tabs */}
-                        <Tabs defaultValue="pdf" className="w-full">
-                          <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="pdf" className="flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              PDF Upload
-                            </TabsTrigger>
-                            <TabsTrigger value="youtube" className="flex items-center gap-2">
-                              <Youtube className="h-4 w-4" />
-                              YouTube URL
-                            </TabsTrigger>
-                          </TabsList>
-                          <TabsContent value="pdf" className="space-y-4">
-                            <FileUploader
-                              onUploadSuccess={handleUploadSuccess}
-                              isGenerating={isGenerating}
-                            />
-                          </TabsContent>
-                          <TabsContent value="youtube" className="space-y-4">
-                            <YouTubeInput
-                              onSuccess={handleYouTubeSuccess}
-                              isProcessing={isGenerating}
-                            />
-                          </TabsContent>
-                        </Tabs>
+                        <FileUploader
+                          onUploadSuccess={handleUploadSuccess}
+                          isGenerating={isGenerating}
+                        />
 
                         {/* Feature Selection Guide */}
                         <Alert className="bg-blue-50 border-blue-200">
@@ -792,7 +745,7 @@ export default function Home() {
                         </div>
                         <h3 className="font-medium">1. Upload</h3>
                         <p className="text-sm text-muted-foreground">
-                          Upload PDFs or paste YouTube links to your study material
+                          Upload your PDF study material
                         </p>
                       </div>
                       <div className="space-y-2">
