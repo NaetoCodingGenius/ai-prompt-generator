@@ -43,7 +43,8 @@ export function UpgradeDialog({
   };
 
   const freeTierFeatures = [
-    { text: '3 generations per day', included: true },
+    { text: '1 generation per day', included: true },
+    { text: '3 AI tutor messages per day', included: true },
     { text: 'Save up to 10 study sets', included: true },
     { text: 'All flashcard features', included: true },
     { text: 'Ad-supported', included: true },
@@ -51,11 +52,11 @@ export function UpgradeDialog({
 
   const premiumFeatures = [
     { text: 'Unlimited generations', icon: Infinity },
+    { text: 'Unlimited AI tutor messages', icon: Sparkles },
     { text: 'No ads', icon: Sparkles },
     { text: 'Unlimited saved sets', icon: Zap },
     { text: 'Export to Anki/Quizlet', icon: Download },
     { text: 'Priority processing', icon: Clock },
-    { text: 'Early access to new features', icon: Sparkles },
   ];
 
   return (
@@ -164,7 +165,7 @@ export function UpgradeDialog({
           {remainingGenerations === 0
             ? `Your free tier resets at ${formatResetTime(
                 resetsAt
-              )}. Come back then for 3 more free generations!`
+              )}. Come back then for 1 more free generation!`
             : 'Cancel anytime. 7-day money-back guarantee.'}
         </p>
       </DialogContent>

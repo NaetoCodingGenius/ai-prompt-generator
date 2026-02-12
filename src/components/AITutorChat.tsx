@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MessageCircle, Send, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useStudyStore } from '@/store/studyStore';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -17,7 +18,7 @@ interface AITutorChatProps {
   title?: string;
 }
 
-const DAILY_MESSAGE_LIMIT = 15;
+const DAILY_MESSAGE_LIMIT = 3;
 
 interface TutorUsage {
   count: number;
@@ -59,6 +60,7 @@ function updateTutorUsage(count: number) {
 }
 
 export function AITutorChat({ context, title }: AITutorChatProps) {
+  const isPremium = useStudyStore((state) => state.isPremium);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -82,10 +84,10 @@ export function AITutorChat({ context, title }: AITutorChatProps) {
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
-    // Check daily limit
+    // Check daily limit (skip for premium users)
     const usage = getTutorUsage();
-    if (usage.count >= DAILY_MESSAGE_LIMIT) {
-      toast.error(`Daily message limit reached (${DAILY_MESSAGE_LIMIT} messages). Resets tomorrow!`);
+    if (!isPremium && usage.count >= DAILY_MESSAGE_LIMIT) {
+      toast.error(`Daily message limit reached (${DAILY_MESSAGE_LIMIT} messages). Upgrade to Premium for unlimited!`);
       return;
     }
 
@@ -113,17 +115,19 @@ export function AITutorChat({ context, title }: AITutorChatProps) {
           { role: 'assistant', content: data.answer },
         ]);
 
-        // Increment usage count
-        const newCount = usage.count + 1;
-        updateTutorUsage(newCount);
-        setMessageCount(newCount);
+        // Increment usage count (only for free users)
+        if (!isPremium) {
+          const newCount = usage.count + 1;
+          updateTutorUsage(newCount);
+          setMessageCount(newCount);
 
-        // Warn when approaching limit
-        const remaining = DAILY_MESSAGE_LIMIT - newCount;
-        if (remaining === 3) {
-          toast('Only 3 messages left today', { icon: '⚠️' });
-        } else if (remaining === 0) {
-          toast.error('Daily limit reached! Resets tomorrow at midnight.');
+          // Warn when approaching limit
+          const remaining = DAILY_MESSAGE_LIMIT - newCount;
+          if (remaining === 1) {
+            toast('Only 1 message left today! Upgrade to Premium for unlimited.', { icon: '⚠️' });
+          } else if (remaining === 0) {
+            toast.error('Daily limit reached! Upgrade to Premium for unlimited messages.');
+          }
         }
       } else {
         toast.error(data.error || 'Failed to get response');
@@ -143,8 +147,8 @@ export function AITutorChat({ context, title }: AITutorChatProps) {
     'How does this relate to other concepts?',
   ];
 
-  const remainingMessages = DAILY_MESSAGE_LIMIT - messageCount;
-  const isLimitReached = remainingMessages <= 0;
+  const remainingMessages = isPremium ? 999 : DAILY_MESSAGE_LIMIT - messageCount;
+  const isLimitReached = !isPremium && remainingMessages <= 0;
 
   return (
     <Card className="flex flex-col h-[600px]">
@@ -156,11 +160,13 @@ export function AITutorChat({ context, title }: AITutorChatProps) {
           </CardTitle>
           <div className="flex items-center gap-2">
             <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-              remainingMessages <= 3
+              isPremium
+                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                : remainingMessages <= 1
                 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
                 : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
             }`}>
-              {remainingMessages} message{remainingMessages === 1 ? '' : 's'} left today
+              {isPremium ? 'Unlimited ✨' : `${remainingMessages} message${remainingMessages === 1 ? '' : 's'} left today`}
             </span>
           </div>
         </div>
@@ -168,7 +174,7 @@ export function AITutorChat({ context, title }: AITutorChatProps) {
           {isLimitReached ? (
             <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
               <AlertCircle className="h-3 w-3" />
-              Daily limit reached. Resets tomorrow at midnight.
+              Daily limit reached. Upgrade to Premium for unlimited messages!
             </span>
           ) : (
             <>Ask questions about {title || 'your study material'}</>

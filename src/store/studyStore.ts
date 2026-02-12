@@ -9,6 +9,10 @@ interface StudyStore {
   currentSetId: string | null;
   usageStats: UsageStats;
   studyProgress: StudyProgress;
+  isPremium: boolean;
+
+  // Premium management
+  setPremium: (isPremium: boolean) => void;
 
   // CRUD operations
   addStudySet: (set: StudySet) => void;
@@ -62,6 +66,10 @@ export const useStudyStore = create<StudyStore>()(
         studyTimeToday: 0,
         accuracy: 0,
       },
+      isPremium: false,
+
+      setPremium: (isPremium) =>
+        set({ isPremium }),
 
       addStudySet: (studySet) =>
         set((state) => ({
@@ -98,12 +106,18 @@ export const useStudyStore = create<StudyStore>()(
         }),
 
       canGenerateToday: () => {
+        const { isPremium } = get();
+        if (isPremium) return true; // Premium users have unlimited generations
+
         get().resetDailyUsageIfNeeded();
         const { usageStats } = get();
         return usageStats.generationsToday < FREE_TIER_DAILY_LIMIT;
       },
 
       getRemainingGenerations: () => {
+        const { isPremium } = get();
+        if (isPremium) return 999; // Show "unlimited" for premium
+
         get().resetDailyUsageIfNeeded();
         const { usageStats } = get();
         return Math.max(0, FREE_TIER_DAILY_LIMIT - usageStats.generationsToday);
