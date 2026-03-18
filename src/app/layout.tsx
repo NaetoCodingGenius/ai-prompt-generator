@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Toaster } from 'react-hot-toast';
@@ -14,21 +14,28 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "AI Study Assistant - Upload Anything, Study in Seconds",
-  description: "Free AI-powered study assistant with spaced repetition, AI tutor, voice mode & Anki export. Upload PDFs and screenshots to transform any content into smart flashcards with Claude AI.",
-  keywords: ["AI study assistant", "flashcard generator", "Claude AI", "study flashcards", "PDF to flashcards", "spaced repetition", "AI tutor", "Anki export", "OCR flashcards", "voice study mode"],
-  authors: [{ name: "AI Study Assistant" }],
+  title: "MenuMind AI - Restaurant Menu Profit Optimization",
+  description: "Find $1,000+ in hidden profit in 5 minutes. AI-powered menu engineering for independent restaurants. $99/month, not $4,000/year.",
+  keywords: ["restaurant menu optimization", "menu engineering", "restaurant profit", "food cost analysis", "menu pricing AI", "restaurant AI", "profit margins", "menu analysis"],
+  authors: [{ name: "MenuMind AI" }],
   openGraph: {
-    title: "AI Study Assistant - Smart Flashcards with Spaced Repetition",
-    description: "Upload PDFs and screenshots to get instant flashcards with AI tutor, spaced repetition, voice mode & Anki export. Powered by Claude AI.",
+    title: "MenuMind AI - Restaurant Menu Profit Optimization",
+    description: "Find $1,000+ in hidden profit in 5 minutes. AI-powered menu engineering that shows which dishes are killing your margins.",
     type: "website",
     url: "https://ai-prompt-generator-beta.vercel.app",
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Study Assistant - Smart Flashcards",
-    description: "Upload anything. Study smarter with AI tutor, spaced repetition & voice mode. Export to Anki. Powered by Claude AI.",
+    title: "MenuMind AI - Menu Profit Optimization",
+    description: "AI menu engineering for independent restaurants. Find hidden profit in minutes, not months.",
   },
 };
 
@@ -45,11 +52,11 @@ export default function RootLayout({
       <head>
         {/* PWA Support */}
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#6366f1" />
+        <meta name="theme-color" content="#10b981" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Study AI" />
+        <meta name="apple-mobile-web-app-title" content="MenuMind AI" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
 
         {/* Google AdSense */}
@@ -98,7 +105,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} antialiased`}
       >
         {children}
         <Toaster position="top-right" />
