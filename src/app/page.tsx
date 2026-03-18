@@ -150,14 +150,6 @@ export default function Home() {
             </a>
           </nav>
 
-          <Button
-            variant="default"
-            className="bg-emerald-600 hover:bg-emerald-700 transition-all hover:scale-105"
-            onClick={() => setShowUpload(true)}
-          >
-            Get Started
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
         </div>
       </header>
 
@@ -191,20 +183,6 @@ export default function Home() {
                     <span className="font-semibold text-slate-900"> $99/month</span>, not $4,000/year.
                   </p>
 
-                  {/* CTA */}
-                  <div className="flex flex-col sm:flex-row items-start gap-4 pt-4">
-                    <Button
-                      size="lg"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-lg px-8 py-6 transition-all hover:scale-105 hover:shadow-lg"
-                      onClick={() => setShowUpload(true)}
-                    >
-                      Analyze My Menu - Free
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                    <p className="text-sm text-slate-500 pt-3">
-                      No credit card required • Results in 5 minutes
-                    </p>
-                  </div>
                 </div>
               </FadeIn>
 
@@ -973,14 +951,6 @@ export default function Home() {
                 <p className="text-xl sm:text-2xl text-emerald-50">
                   Free analysis. No credit card required. Results in 5 minutes.
                 </p>
-                <Button
-                  size="lg"
-                  className="bg-white text-emerald-600 hover:bg-emerald-50 text-lg px-8 py-6 transition-all hover:scale-105 hover:shadow-xl"
-                  onClick={() => setShowUpload(true)}
-                >
-                  Analyze My Menu Now
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
                 <p className="text-sm text-emerald-100">
                   Join 100+ restaurant owners maximizing their profits
                 </p>
